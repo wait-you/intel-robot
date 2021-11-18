@@ -13,9 +13,9 @@ class IntelRobotApplication : Application(){
         @SuppressLint("StaticFieldLeak")
         lateinit var context : Context
         //图灵机器人的API_KEY
-        val API_KEY = ""
+        const val API_KEY = "8b6ec61f2c6445059fb1917f30182d2e"
         //图灵机器人的账号
-        val USER_ID = ""
+        const val USER_ID = "743052"
     }
 
     override fun onCreate() {

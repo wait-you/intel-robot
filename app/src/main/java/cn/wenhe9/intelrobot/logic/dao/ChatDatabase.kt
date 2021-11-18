@@ -1,28 +1,32 @@
 package cn.wenhe9.intelrobot.logic.dao
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+import cn.wenhe9.intelrobot.logic.model.ChatBean
 
 /**
  *@author DuJinliang
  *2021/11/17
  */
-class ChatDatabase(context : Context, name : String, version : Int) : SQLiteOpenHelper(context, name, null, version) {
+@Database(version = 1, entities = [ChatBean::class])
+abstract class ChatDatabase : RoomDatabase(){
+    abstract fun chatDao() : ChatDao
 
-    private val createChatMessage = "\tcreate table chat_message(\n" +
-            "\t\tid integer primary key autoincrement,\n" +
-            "\t\tstate integer,\n" +
-            "\t\tmessage varchar(100)\n" +
-            "\t);"
+    companion object {
+        private var instance : ChatDatabase? = null
 
-    override fun onCreate(db: SQLiteDatabase?) {
-        db?.execSQL(createChatMessage)
-    }
+        @Synchronized
+        fun getDatabase(context: Context) : ChatDatabase {
+            instance?.let {
+                return it
+            }
 
-    override fun onUpgrade(db: SQLiteDatabase?, oldVersion: Int, newVersion: Int) {
-        if (oldVersion <= 1){
-            db?.execSQL(createChatMessage)
+            return Room.databaseBuilder(context.applicationContext, ChatDatabase::class.java, "robot_chat")
+                .build().apply {
+                    instance = this
+                }
         }
     }
 }

@@ -18,7 +18,7 @@ object Repository {
         if (response.intent.code == 10004){
             Result.success(response.results)
         }else{
-            Result.failure(RuntimeException("response satus is ${response.intent.code}"))
+            Result.failure(RuntimeException("response status is ${response.intent.code}"))
         }
     }
 

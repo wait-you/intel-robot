@@ -1,34 +1,21 @@
 package cn.wenhe9.intelrobot
 
-import android.os.Build
+import android.graphics.Color
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
-import android.view.WindowInsetsController
 import android.widget.Toast
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import cn.wenhe9.intelrobot.databinding.ActivityMainBinding
-import cn.wenhe9.intelrobot.logic.Repository
-import cn.wenhe9.intelrobot.logic.dao.ChatDao
+import cn.wenhe9.intelrobot.logic.dao.ChatDatabase
 import cn.wenhe9.intelrobot.logic.model.ChatBean
-import cn.wenhe9.intelrobot.logic.model.MessageResponse
-import cn.wenhe9.intelrobot.logic.network.RobotService
-import cn.wenhe9.intelrobot.logic.network.ServiceCreator
 import cn.wenhe9.intelrobot.ui.ChatAdapter
 import cn.wenhe9.intelrobot.ui.MessageViewModel
 import cn.wenhe9.intelrobot.utils.RequestParseUtil
-import okhttp3.Callback
-import okhttp3.MediaType
-import okhttp3.RequestBody
-import retrofit2.Call
-import retrofit2.Response
-import retrofit2.Retrofit
 import java.util.*
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 class MainActivity : AppCompatActivity() {
@@ -49,14 +36,14 @@ class MainActivity : AppCompatActivity() {
         ViewModelProvider(this).get(MessageViewModel::class.java)
     }
 
+    private val chatDao by lazy {
+        ChatDatabase.getDatabase(IntelRobotApplication.context).chatDao()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        //从数据库获取历史记录
-        history = ChatDao.getHistory() as MutableList<ChatBean>
-        chatList.addAll(history)
 
         //随机获取欢迎语
         val index = Random().nextInt(welcome.size)
@@ -69,6 +56,8 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
         recyclerView.scrollToPosition(chatList.size - 1)
+
+        loadHistory()
 
         //观察数据，当变化时，更新ui
         viewModel.valueLiveData.observe(this){ message ->
@@ -101,10 +90,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+
+    private fun loadHistory(){
+        //从数据库获取历史记录
+        thread {
+            history = chatDao.getHistory() as MutableList<ChatBean>
+            chatList.addAll(history)
+            adapter.notifyDataSetChanged()
+        }
+    }
+
     @Synchronized
     private fun setChatItem(msg : ChatBean){
         chatList.add(msg)
         newList.add(msg)
+        thread {
+            chatDao.saveNew(msg)
+        }
         adapter.notifyItemInserted(chatList.size -  1)
         binding.list.scrollToPosition(chatList.size - 1)
     }
@@ -116,8 +118,6 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "再按一次退出智能聊天程序", Toast.LENGTH_SHORT).show()
                 exitTime = System.currentTimeMillis()
             }else{
-                //保存消息到历史
-                ChatDao.saveNew(newList)
                 finish()
                 exitProcess(0)
             }

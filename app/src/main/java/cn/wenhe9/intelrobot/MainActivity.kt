@@ -21,12 +21,7 @@ import kotlin.system.exitProcess
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding : ActivityMainBinding
-    private val chatList = mutableListOf<ChatBean>()
-    private var history = mutableListOf<ChatBean>()
-    private val newList = mutableListOf<ChatBean>()
     private lateinit var adapter : ChatAdapter
-
-    private var exitTime = 0L
 
     private val welcome by lazy {
         resources.getStringArray(R.array.welcome)
@@ -45,19 +40,23 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        if(viewModel.isLoad()){
+            thread {
+                viewModel.loadHistory()
+            }
+        }
+
         //随机获取欢迎语
         val index = Random().nextInt(welcome.size)
-        chatList.add(ChatBean(ChatBean.RECEIVE, welcome[index]))
+        viewModel.refresh(ChatBean(ChatBean.RECEIVE, welcome[index]))
 
         //展示历史记录并跳转到最后
-        adapter = ChatAdapter(chatList)
+        adapter = ChatAdapter(viewModel.dataList)
         val layoutManager = LinearLayoutManager(this)
         val recyclerView = binding.list
         recyclerView.layoutManager = layoutManager
         recyclerView.adapter = adapter
-        recyclerView.scrollToPosition(chatList.size - 1)
-
-        loadHistory()
+        recyclerView.scrollToPosition(viewModel.dataList.size - 1)
 
         //观察数据，当变化时，更新ui
         viewModel.valueLiveData.observe(this){ message ->
@@ -84,39 +83,28 @@ class MainActivity : AppCompatActivity() {
 
                 val body = RequestParseUtil.parseRequestBody(msg)
 
-                viewModel.refresh(body)
+                viewModel.sendMessage(body)
             }
 
         }
     }
 
-
-    private fun loadHistory(){
-        //从数据库获取历史记录
-        thread {
-            history = chatDao.getHistory() as MutableList<ChatBean>
-            chatList.addAll(history)
-            adapter.notifyDataSetChanged()
-        }
-    }
-
     @Synchronized
     private fun setChatItem(msg : ChatBean){
-        chatList.add(msg)
-        newList.add(msg)
+        viewModel.refresh(msg)
         thread {
             chatDao.saveNew(msg)
         }
-        adapter.notifyItemInserted(chatList.size -  1)
-        binding.list.scrollToPosition(chatList.size - 1)
+        adapter.notifyItemInserted(viewModel.dataList.size -  1)
+        binding.list.scrollToPosition(viewModel.dataList.size - 1)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
 
         if (keyCode == KeyEvent.KEYCODE_BACK && event?.action == KeyEvent.ACTION_DOWN){
-            if (System.currentTimeMillis() - exitTime > 2000){
+            if (System.currentTimeMillis() - viewModel.exitTime > 2000){
                 Toast.makeText(this, "再按一次退出智能聊天程序", Toast.LENGTH_SHORT).show()
-                exitTime = System.currentTimeMillis()
+                viewModel.exitTime = System.currentTimeMillis()
             }else{
                 finish()
                 exitProcess(0)
